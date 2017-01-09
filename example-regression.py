@@ -1,12 +1,13 @@
+"""NestedGridSearchCV example: fit a regression model."""
 import logging
 import numpy
 
-from sklearn.cross_validation import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_boston
-
 from grid_search import NestedGridSearchCV
 from sklearn.svm import SVR
+from mpi4py import MPI
 
 data = load_boston()
 X = data['data']
@@ -24,11 +25,15 @@ kfold_cv = StratifiedKFold(y, n_folds=5)
 
 logging.basicConfig(level=logging.INFO)
 
-nested_cv = NestedGridSearchCV(estimator, param_grid, 'mean_absolute_error', cv=kfold_cv,
-                               inner_cv=lambda _x, _y: StratifiedKFold(_y, n_folds=3))
+nested_cv = NestedGridSearchCV(estimator,
+                               param_grid,
+                               'mean_absolute_error',
+                               cv=kfold_cv,
+                               inner_cv=lambda _x, _y: StratifiedKFold(
+                                _y, n_folds=3))
 nested_cv.fit(X, y)
 
-from mpi4py import MPI
+
 if MPI.COMM_WORLD.Get_rank() == 0:
     for i, scores in enumerate(nested_cv.grid_scores_):
         scores.to_csv('grid-scores-%d.csv' % (i + 1), index=False)
