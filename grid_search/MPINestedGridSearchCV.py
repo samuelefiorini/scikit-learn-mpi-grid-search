@@ -76,7 +76,7 @@ def _get_best_parameters(fold_results, param_names):
 
 
 class MPIBatchWorker(object):
-    """Base class to fit and score an estimator"""
+    """Base class to fit and score an estimator."""
 
     def __init__(self, estimator, scorer, fit_params, verbose=False):
         self.estimator = estimator
@@ -115,7 +115,7 @@ class MPIBatchWorker(object):
 
 
 class MPISlave(MPIBatchWorker):
-    """Receives task from root node and sends results back"""
+    """Receives task from root node and sends results back."""
 
     def __init__(self, estimator, scorer, fit_params):
         super(MPISlave, self).__init__(estimator, scorer, fit_params)
@@ -146,15 +146,15 @@ class MPISlave(MPIBatchWorker):
         comm.send((fold_id, test_results[0]['score']),
                   dest=0, tag=MPI_TAG_RESULT)
 
-
     def run(self):
-        """Wait for new data until node receives a message with MPI_MSG_TERMINATE or MPI_MSG_TEST
+        """Wait for new data until node receives a terminate or a test message.
 
         In the beginning, the node is waiting for new batches distributed by
-        :class:`MPIGridSearchCVMaster._scatter_work`. After the grid search has been completed,
-        the node either receives data from :func:`_fit_and_score_with_parameters` to
-        evaluate the estimator given the parameters determined during grid-search, or is asked
-        to terminate.
+        :class:`MPIGridSearchCVMaster._scatter_work`.
+        After the grid search has been completed, the node either receives data
+        from :func:`_fit_and_score_with_parameters` to evaluate the estimator
+        given the parameters determined during grid-search, or is asked
+        to terminate. Stop messages are: MPI_MSG_TERMINATE or MPI_MSG_TEST.
         """
         task_desc = self._task_desc
 
@@ -175,7 +175,7 @@ class MPISlave(MPIBatchWorker):
 
 
 class MPIGridSearchCVMaster(MPIBatchWorker):
-    """Running on the root node and distributes work across slaves"""
+    """Running on the root node and distributes work across slaves."""
 
     def __init__(self, param_grid, cv_iter, estimator, scorer, fit_params):
         super(MPIGridSearchCVMaster, self).__init__(estimator,
@@ -191,7 +191,8 @@ class MPIGridSearchCVMaster(MPIBatchWorker):
         i = 0
         for fold_id, (train_index, test_index) in enumerate(self.cv_iter):
             for parameters in param_iter:
-                work_batches[i % comm_size].append((fold_id + 1, train_index, test_index, parameters))
+                work_batches[i % comm_size].append((fold_id + 1, train_index,
+                                                    test_index, parameters))
                 i += 1
 
         return work_batches
@@ -199,7 +200,8 @@ class MPIGridSearchCVMaster(MPIBatchWorker):
     def _scatter_work(self):
         work_batches = self._create_batches()
 
-        LOG.debug("Distributed items into %d batches of size %d", comm_size, len(work_batches[0]))
+        LOG.debug("Distributed items into %d batches of size %d", comm_size,
+                  len(work_batches[0]))
 
         # Distribute batches across all nodes
         root_work_batch = comm.scatter(work_batches, root=0)
@@ -208,7 +210,8 @@ class MPIGridSearchCVMaster(MPIBatchWorker):
         return root_result_batch
 
     def _gather_work(self, root_result_batch):
-        # collect results: list of list of dict of parameters and performance measures
+        # collect results: list of list of dict of parameters and performance
+        # measures
         result_batches = comm.gather(root_result_batch, root=0)
 
         out = []
@@ -237,8 +240,7 @@ class MPIGridSearchCVMaster(MPIBatchWorker):
 
 
 def _fit_and_score_with_parameters(X, y, cv, best_parameters):
-    """Distributes work of non-nested cross-validation across slave nodes"""
-
+    """Distribute work of non-nested cross-validation across slave nodes."""
     # tell slaves testing phase is next
     _task_desc = numpy.empty(2, dtype=int)
     _task_desc[1] = MPI_MSG_TEST
@@ -259,7 +261,8 @@ def _fit_and_score_with_parameters(X, y, cv, best_parameters):
 
     scores = {}
     for i in range(len(cv)):
-        fold_id, test_result = comm.recv(source=MPI.ANY_SOURCE, tag=MPI_TAG_RESULT)
+        fold_id, test_result = comm.recv(source=MPI.ANY_SOURCE,
+                                         tag=MPI_TAG_RESULT)
         scores[fold_id] = test_result
 
     # Tell all nodes to terminate
@@ -270,13 +273,14 @@ def _fit_and_score_with_parameters(X, y, cv, best_parameters):
 
 
 class NestedGridSearchCV(BaseEstimator):
-    """Cross-validation with nested hyper-parameter search for each training fold.
+    """Cross-validation with nested parameter search for each training fold.
 
-    The data is first split into ``cv`` train and test sets. For each training set.
-    a grid search over the specified set of parameters is performed (inner cross-validation).
-    The set of parameters that achieved the highest average score across all inner folds
-    is used to re-fit a model on the entire training set of the outer cross-validation loop.
-    Finally, results on the test set of the outer loop are reported.
+    The data is first split into ``cv`` train and test sets. For each training
+    set a grid search over the specified set of parameters is performed
+    (inner cross-validation). The set of parameters that achieved the highest
+    average score across all inner folds is used to re-fit a model on the
+    entire training set of the outer cross-validation loop. Finally, results on
+    the test set of the outer loop are reported.
 
     Parameters
     ----------
@@ -306,9 +310,9 @@ class NestedGridSearchCV(BaseEstimator):
 
     inner_cv : integer or callable, default=3
         If an integer is passed, it is the number of folds.
-        If callable, the function must have the signature ``inner_cv_func(X, y)``
-        and return a cross-validation object, see sklearn.cross_validation
-        module for the list of possible objects.
+        If callable, the function must have the signature
+        ``inner_cv_func(X, y)`` and return a cross-validation object,
+        see sklearn.model_selection module for the list of possible objects.
 
     multi_output : boolean, default=False
         Allow multi-output y, as for multivariate regression.
@@ -330,8 +334,8 @@ class NestedGridSearchCV(BaseEstimator):
         parameters for the model.
     """
 
-    def __init__(self, estimator, param_grid, scoring=None, fit_params=None, cv=None,
-                 inner_cv=None, multi_output=False):
+    def __init__(self, estimator, param_grid, scoring=None, fit_params=None,
+                 cv=None, inner_cv=None, multi_output=False):
         self.scoring = scoring
         self.estimator = estimator
         self.param_grid = param_grid
@@ -345,9 +349,12 @@ class NestedGridSearchCV(BaseEstimator):
         if callable(self.inner_cv):
             inner_cv = self.inner_cv(train_X, train_y)
         else:
-            inner_cv = _check_cv(self.inner_cv, train_X, train_y, classifier=is_classifier(self.estimator))
+            inner_cv = _check_cv(self.inner_cv, train_X, train_y,
+                                 classifier=is_classifier(self.estimator))
 
-        master = MPIGridSearchCVMaster(self.param_grid, inner_cv, self.estimator, self.scorer_, self.fit_params)
+        master = MPIGridSearchCVMaster(self.param_grid, inner_cv,
+                                       self.estimator, self.scorer_,
+                                       self.fit_params)
         return master.run(train_X, train_y)
 
     def _fit_master(self, X, y, cv):
@@ -365,16 +372,19 @@ class NestedGridSearchCV(BaseEstimator):
             grid_search_results.append(grid_results)
 
             max_performance = _get_best_parameters(grid_results, param_names)
-            LOG.info("Best performance for fold %d:\n%s", i + 1, max_performance)
+            LOG.info("Best performance for fold %d:\n%s", i + 1,
+                     max_performance)
             max_performance['fold'] = i + 1
             best_parameters.append(max_performance)
 
         best_parameters = pandas.DataFrame(best_parameters)
         best_parameters.set_index('fold', inplace=True)
         best_parameters['score (Test)'] = 0.0
-        best_parameters.rename(columns={'score': 'score (Validation)'}, inplace=True)
+        best_parameters.rename(columns={'score': 'score (Validation)'},
+                               inplace=True)
 
-        scores = _fit_and_score_with_parameters(X, y, cv, best_parameters.loc[:, param_names])
+        scores = _fit_and_score_with_parameters(
+            X, y, cv, best_parameters.loc[:, param_names])
         best_parameters['score (Test)'] = scores
 
         self.best_params_ = best_parameters
@@ -385,7 +395,9 @@ class NestedGridSearchCV(BaseEstimator):
         slave.run()
 
     def fit(self, X, y):
-        X, y = check_X_y(X, y, force_all_finite=False, multi_output=self.multi_output)
+        """Fit the model to the training data."""
+        X, y = check_X_y(X, y, force_all_finite=False,
+                         multi_output=self.multi_output)
         _check_param_grid(self.param_grid)
 
         cv = _check_cv(self.cv, X, y, classifier=is_classifier(self.estimator))
