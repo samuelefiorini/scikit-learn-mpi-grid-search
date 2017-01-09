@@ -102,7 +102,9 @@ class MPIBatchWorker(object):
             ret = _fit_and_score(clone(self.estimator),
                                  self._data_X, self._data_y,
                                  self.scorer, train_index, test_index,
-                                 self.verbose, parameters, fit_params)
+                                 self.verbose, parameters, fit_params,
+                                 return_n_test_samples=True,
+                                 return_times=True)
 
             result = parameters.copy()
             result['score'] = ret[0]
@@ -249,9 +251,12 @@ def _fit_and_score_with_parameters(X, y, cv, best_parameters):
     comm.Bcast([_task_desc, MPI.INT], root=0)
     comm.bcast((X, y), root=0)
 
-    assert comm_size >= len(cv)
+    # Compability with sklearn > 0.18 TODO
+    _splitted_cv = [(a, b) for a, b in cv.split(X)]
 
-    for i, (train_index, test_index) in enumerate(cv):
+    assert comm_size >= len(_splitted_cv)
+
+    for i, (train_index, test_index) in enumerate(_splitted_cv):
         fold_id = i + 1
         LOG.info("Testing fold %d", fold_id)
 
@@ -261,13 +266,13 @@ def _fit_and_score_with_parameters(X, y, cv, best_parameters):
         comm.send(work_item, dest=fold_id, tag=MPI_TAG_TRAIN_TEST_DATA)
 
     scores = {}
-    for i in range(len(cv)):
+    for i in range(len(_splitted_cv)):
         fold_id, test_result = comm.recv(source=MPI.ANY_SOURCE,
                                          tag=MPI_TAG_RESULT)
         scores[fold_id] = test_result
 
     # Tell all nodes to terminate
-    for i in range(len(cv), comm_size):
+    for i in range(len(_splitted_cv), comm_size):
         comm.send((0, None), dest=i, tag=MPI_TAG_TRAIN_TEST_DATA)
 
     return pandas.Series(scores)
@@ -348,10 +353,14 @@ class NestedGridSearchCV(BaseEstimator):
 
     def _grid_search(self, train_X, train_y):
         if callable(self.inner_cv):
-            inner_cv = self.inner_cv(train_X, train_y)
+            # inner_cv = self.inner_cv(train_X, train_y)
+            inner_cv = self.inner_cv.split(train_X)
         else:
-            inner_cv = _check_cv(self.inner_cv, train_X, train_y,
-                                 classifier=is_classifier(self.estimator))
+            # inner_cv = _check_cv(self.inner_cv, train_X, train_y,
+            #                      classifier=is_classifier(self.estimator))
+            inner_cv = _check_cv(self.inner_cv, train_y,
+                                 classifier=is_classifier(
+                                    self.estimator)).split(train_X)
 
         master = MPIGridSearchCVMaster(self.param_grid, inner_cv,
                                        self.estimator, self.scorer_,
@@ -363,7 +372,7 @@ class NestedGridSearchCV(BaseEstimator):
 
         best_parameters = []
         grid_search_results = []
-        for i, (train_index, test_index) in enumerate(cv):
+        for i, (train_index, test_index) in enumerate(cv.split(X)):
             LOG.info("Training fold %d", i + 1)
 
             train_X = X[train_index, :]
@@ -401,7 +410,8 @@ class NestedGridSearchCV(BaseEstimator):
                          multi_output=self.multi_output)
         _check_param_grid(self.param_grid)
 
-        cv = _check_cv(self.cv, X, y, classifier=is_classifier(self.estimator))
+        # cv = _check_cv(self.cv, X, y, classifier=is_classifier(self.estimator))
+        cv = _check_cv(self.cv, y, classifier=is_classifier(self.estimator))
 
         self.scorer_ = check_scoring(self.estimator, scoring=self.scoring)
 

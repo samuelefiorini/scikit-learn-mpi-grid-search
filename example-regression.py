@@ -20,7 +20,7 @@ param_grid = {'C': 2. ** numpy.arange(-5, 15, 2),
               'gamma': 2. ** numpy.arange(3, -15, -2),
               'kernel': ['poly', 'rbf']}
 
-kfold_cv = StratifiedKFold(y, n_folds=5)
+kfold_cv = StratifiedKFold(y, n_splits=5)
 
 
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ nested_cv = NestedGridSearchCV(estimator,
                                'mean_absolute_error',
                                cv=kfold_cv,
                                inner_cv=lambda _x, _y: StratifiedKFold(
-                                _y, n_folds=3))
+                                _y, n_splits=3))
 nested_cv.fit(X, y)
 
 
