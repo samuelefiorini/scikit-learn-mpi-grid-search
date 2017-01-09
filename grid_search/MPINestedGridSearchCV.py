@@ -14,7 +14,8 @@ from sklearn.model_selection import check_cv as _check_cv
 from sklearn.metrics.scorer import check_scoring
 from sklearn.base import is_classifier
 from sklearn.model_selection._validation import _fit_and_score
-from sklearn.model_selection import ParameterGrid, _check_param_grid
+from sklearn.model_selection import ParameterGrid
+from sklearn.model_selection._search import _check_param_grid
 from sklearn.utils import check_X_y
 
 
