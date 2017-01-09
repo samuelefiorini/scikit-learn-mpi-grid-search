@@ -1,12 +1,22 @@
-import logging
+"""Nested Cross-Validation for scikit-learn using MPI.
 
+This package provides nested cross-validation similar to scikit-learn's
+GridSearchCV but uses the Message Passing Interface (MPI)
+for parallel computing.
+"""
+
+import logging
 import numpy
 from mpi4py import MPI
 import pandas
 from sklearn.base import BaseEstimator, clone
-from sklearn.cross_validation import _check_cv, check_scoring, is_classifier, _fit_and_score
+from sklearn.model_selection import check_cv as _check_cv
+from sklearn.metrics.scorer import check_scoring
+from sklearn.base import is_classifier
+from sklearn.model_selection._validation import _fit_and_score
 from sklearn.grid_search import ParameterGrid, _check_param_grid
 from sklearn.utils import check_X_y
+
 
 __all__ = ['NestedGridSearchCV']
 
@@ -25,7 +35,7 @@ comm_rank = comm.Get_rank()
 
 
 def _get_best_parameters(fold_results, param_names):
-    """Get best setting of parameters from grid search
+    """Get best setting of parameters from grid search.
 
     Parameters
     ----------
@@ -52,7 +62,8 @@ def _get_best_parameters(fold_results, param_names):
     max_idx = mean_performance.loc[:, 'score'].idxmax()
 
     # best parameters
-    max_performance = pandas.Series({'score': mean_performance.loc[max_idx, 'score']})
+    max_performance = pandas.Series({'score':
+                                     mean_performance.loc[max_idx, 'score']})
     if len(param_names) == 1:
         key = param_names[0]
         max_performance[key] = max_idx
@@ -132,7 +143,9 @@ class MPISlave(MPIBatchWorker):
 
         test_results = self.process_batch([work_item])
 
-        comm.send((fold_id, test_results[0]['score']), dest=0, tag=MPI_TAG_RESULT)
+        comm.send((fold_id, test_results[0]['score']),
+                  dest=0, tag=MPI_TAG_RESULT)
+
 
     def run(self):
         """Wait for new data until node receives a message with MPI_MSG_TERMINATE or MPI_MSG_TEST
@@ -385,4 +398,3 @@ class NestedGridSearchCV(BaseEstimator):
             self._fit_slave()
 
         return self
-
