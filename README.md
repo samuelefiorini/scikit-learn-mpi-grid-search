@@ -6,7 +6,7 @@ but uses the Message Passing Interface (MPI) for parallel computing.
 
 ## Requirements
 
-* [scikit-learn](http://scikit-learn.org) 0.16.0 or later
+* [scikit-learn](http://scikit-learn.org) 0.18.1 or later
 * [mpi4py](http://mpi4py.scipy.org)
 * [pandas](http://pandas.pydata.org)
 
